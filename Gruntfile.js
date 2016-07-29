@@ -40,7 +40,7 @@ module.exports = function (grunt) {
 
       group.push({
         type: 'photo',
-        path: '/media/visual/' + file,
+        path: 'media/visual/' + file,
         width: dim.width,
         height: dim.height
       });
