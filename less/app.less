@@ -1,0 +1,36 @@
+@import "reset.less";
+
+@image-margin: 10px;
+
+#main {
+  background-color: black;
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+.photo {
+  position: absolute;
+  top: @image-margin;
+  right: @image-margin;
+  bottom: @image-margin;
+  left: @image-margin;
+  transition: opacity 1s linear;
+  opacity: 0;
+
+  &.show {
+    opacity: 1;
+  }
+
+  > img {
+    position: absolute;
+    margin: auto;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    max-width: 100%;
+    max-height: 100%;
+  }
+}
