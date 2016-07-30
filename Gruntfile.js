@@ -2,6 +2,8 @@
 
 var _ = require('lodash');
 var sizeOf = require('image-size');
+var getVideoDimensions = require('get-video-dimensions');
+var Promise = require('bluebird').Promise;
 
 module.exports = function (grunt) {
   // Time how long tasks take
@@ -19,37 +21,50 @@ module.exports = function (grunt) {
   ]);
 
   grunt.registerTask('gather_media', function () {
+    var done = this.async();
     var files = grunt.file.expand({
       cwd: './app/media/visual'
     }, [
-      '*/*{jpg,jpeg,JPG,JPEG}'
+      '*/*'
     ]);
 
     var groups = [],
       group = [],
       lastGroup = null;
-    _.forEach(files, function(file) {
-      var parts = _.split(file, '/');
-      var groupName = parts[0];
-      var dim = sizeOf('app/media/visual/' + file);
+
+    Promise.each(files, function(file) {
+      var groupName = _.split(file, '/')[0];
+      var extension = _.last(_.split(file, '.')).toLowerCase();
 
       if (groupName !== lastGroup && group.length > 0) {
         groups.push(group);
         group = [];
       }
-
-      group.push({
-        type: 'photo',
-        path: 'media/visual/' + file,
-        width: dim.width,
-        height: dim.height
-      });
-
       lastGroup = groupName;
+
+      if (extension === 'mp4') {
+        return getVideoDimensions('app/media/visual/' + file).then(function(result) {
+          group.push({
+            type: 'video',
+            path: 'media/visual/' + file,
+            width: result.width,
+            height: result.height
+          });
+        });
+      } else {
+        var dim = sizeOf('app/media/visual/' + file);
+
+        group.push({
+          type: 'photo',
+          path: 'media/visual/' + file,
+          width: dim.width,
+          height: dim.height
+        });
+      }
+    }).then(function() {
+      groups.push(group);
+      grunt.file.write('app/data.json', JSON.stringify(groups));
+      done();
     });
-
-    groups.push(group);
-
-    grunt.file.write('app/data.json', JSON.stringify(groups));
   });
 };
