@@ -10077,12 +10077,12 @@ return jQuery;
 },{}],2:[function(require,module,exports){
 'use strict';
 
-var ImageProvider = require('./ImageProvider.js');
+var DataProvider = require('./DataProvider.js');
 
 var AppInitializer = (function () {
   var init = function () {
     return Promise.all([
-      ImageProvider.init('data.json')
+      DataProvider.init('data.json')
     ]);
   };
 
@@ -10093,12 +10093,12 @@ var AppInitializer = (function () {
 
 module.exports = AppInitializer;
 
-},{"./ImageProvider.js":3}],3:[function(require,module,exports){
+},{"./DataProvider.js":3}],3:[function(require,module,exports){
 'use strict';
 
 var $ = require('jquery');
 
-var ImageProvider = (function () {
+var DataProvider = (function () {
   var images = null,
     groupIndex = 0,
     imageIndex = 0,
@@ -10123,7 +10123,7 @@ var ImageProvider = (function () {
     init = function (dataFilePath) {
       return new Promise(function(resolve) {
         $.getJSON(dataFilePath, function (data) {
-          images = data;
+          images = data.visual;
           resolve();
         });
       });
@@ -10135,14 +10135,14 @@ var ImageProvider = (function () {
   };
 })();
 
-module.exports = ImageProvider;
+module.exports = DataProvider;
 
 },{"jquery":1}],4:[function(require,module,exports){
 'use strict';
 
 var $ = require('jquery');
 var AppInitializer = require('./AppInitializer.js');
-var ImageProvider = require('./ImageProvider.js');
+var DataProvider = require('./DataProvider.js');
 
 AppInitializer.init().then(function() {
   var container = $('#main');
@@ -10155,19 +10155,45 @@ AppInitializer.init().then(function() {
     }));
   };
 
+  var createVideo = function (video) {
+    return $('<div>').attr({
+      'class': 'photo'
+    }).append($('<video>').attr({
+      muted: true,
+      preload: 'auto',
+      src: video.path,
+      autoplay: true
+    }));
+  };
+
   var showPhoto = function () {
     $('.photo').toggleClass('show');
   };
 
   var onPhotoReady = function (image) {
-    var newPhoto = createPhoto(image);
-    container.append(newPhoto);
+    var newMedia = image.type === 'photo'
+      ? createPhoto(image)
+      : createVideo(image);
+
+    container.append(newMedia);
     setTimeout(showPhoto, 250);
-    setTimeout(changePhoto, 4000);
+
+    if (image.type === 'photo') {
+      setTimeout(changePhoto, 4000);
+    } else {
+      var triggered = false;
+      $('video', newMedia).on('timeupdate', function() {
+        console.log(triggered, this.duration, this.currentTime, this.duration - this.currentTime);
+        if (!triggered && this.duration - this.currentTime < 1.25) {
+          triggered = true;
+          changePhoto();
+        }
+      });
+    }
   };
 
   var changePhoto = function () {
-    ImageProvider.getNextImage().then(onPhotoReady);
+    DataProvider.getNextImage().then(onPhotoReady);
   };
 
   container.on('transitionend', function() {
@@ -10179,4 +10205,4 @@ AppInitializer.init().then(function() {
   console.error(message);
 });
 
-},{"./AppInitializer.js":2,"./ImageProvider.js":3,"jquery":1}]},{},[4]);
+},{"./AppInitializer.js":2,"./DataProvider.js":3,"jquery":1}]},{},[4]);

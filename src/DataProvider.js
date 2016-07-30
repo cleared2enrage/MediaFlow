@@ -27,7 +27,7 @@ var DataProvider = (function () {
     init = function (dataFilePath) {
       return new Promise(function(resolve) {
         $.getJSON(dataFilePath, function (data) {
-          images = data;
+          images = data.visual;
           resolve();
         });
       });

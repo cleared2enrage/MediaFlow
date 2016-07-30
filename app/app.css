@@ -141,7 +141,7 @@ table {
 .photo.show {
   opacity: 1;
 }
-.photo > img {
+.photo > * {
   position: absolute;
   margin: auto;
   top: 0;
