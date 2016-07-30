@@ -3,9 +3,11 @@
 var $ = require('jquery');
 var AppInitializer = require('./AppInitializer.js');
 var DataProvider = require('./DataProvider.js');
+var TweenMax = require('gsap');
 
 AppInitializer.init().then(function() {
   var container = $('#main');
+  var audioPlayer = null;
 
   var createPhoto = function (image) {
     return $('<div>').attr({
@@ -43,7 +45,6 @@ AppInitializer.init().then(function() {
     } else {
       var triggered = false;
       $('video', newMedia).on('timeupdate', function() {
-        console.log(triggered, this.duration, this.currentTime, this.duration - this.currentTime);
         if (!triggered && this.duration - this.currentTime < 1.25) {
           triggered = true;
           changePhoto();
@@ -56,11 +57,43 @@ AppInitializer.init().then(function() {
     DataProvider.getNextImage().then(onPhotoReady);
   };
 
+  var onSongReady = function(song) {
+    var triggered = false;
+    if (audioPlayer == null) {
+      audioPlayer = $('<audio>').attr({
+        autoplay: true,
+        preload: 'auto',
+        volume: 0
+      }).on('timeupdate', function() {
+        if (!triggered && this.duration - this.currentTime < 5.25) {
+          triggered = true;
+          TweenMax.to(this, 5, {volume: 0});
+        }
+      }).on('ended', function() {
+        triggered = false;
+        changeSong();
+      });
+      audioPlayer[0].volume = 0;
+      $('body').append(audioPlayer);
+    }
+    audioPlayer[0].pause();
+    audioPlayer.attr({
+      src: song.path
+    });
+    audioPlayer[0].play();
+    TweenMax.to(audioPlayer, 5, { volume: 1 });
+  };
+
+  var changeSong = function() {
+    DataProvider.getNextAudio().then(onSongReady);
+  };
+
   container.on('transitionend', function() {
     $('.photo:not(.show)').remove();
   });
 
   changePhoto();
+  changeSong();
 }, function (message) {
   console.error(message);
 });
