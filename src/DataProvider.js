@@ -2,7 +2,7 @@
 
 var $ = require('jquery');
 
-var ImageProvider = (function () {
+var DataProvider = (function () {
   var images = null,
     groupIndex = 0,
     imageIndex = 0,
@@ -39,4 +39,4 @@ var ImageProvider = (function () {
   };
 })();
 
-module.exports = ImageProvider;
+module.exports = DataProvider;

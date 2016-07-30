@@ -2,7 +2,7 @@
 
 var $ = require('jquery');
 var AppInitializer = require('./AppInitializer.js');
-var ImageProvider = require('./ImageProvider.js');
+var DataProvider = require('./DataProvider.js');
 
 AppInitializer.init().then(function() {
   var container = $('#main');
@@ -27,7 +27,7 @@ AppInitializer.init().then(function() {
   };
 
   var changePhoto = function () {
-    ImageProvider.getNextImage().then(onPhotoReady);
+    DataProvider.getNextImage().then(onPhotoReady);
   };
 
   container.on('transitionend', function() {

@@ -1,11 +1,11 @@
 'use strict';
 
-var ImageProvider = require('./ImageProvider.js');
+var DataProvider = require('./DataProvider.js');
 
 var AppInitializer = (function () {
   var init = function () {
     return Promise.all([
-      ImageProvider.init('data.json')
+      DataProvider.init('data.json')
     ]);
   };
 

@@ -22,14 +22,17 @@ module.exports = function (grunt) {
 
   grunt.registerTask('gather_media', function () {
     var done = this.async();
+    var data = {
+      audio: [],
+      visual: []
+    };
     var files = grunt.file.expand({
       cwd: './app/media/visual'
     }, [
       '*/*'
     ]);
 
-    var groups = [],
-      group = [],
+    var group = [],
       lastGroup = null;
 
     Promise.each(files, function(file) {
@@ -37,7 +40,7 @@ module.exports = function (grunt) {
       var extension = _.last(_.split(file, '.')).toLowerCase();
 
       if (groupName !== lastGroup && group.length > 0) {
-        groups.push(group);
+        data.visual.push(group);
         group = [];
       }
       lastGroup = groupName;
@@ -62,8 +65,22 @@ module.exports = function (grunt) {
         });
       }
     }).then(function() {
-      groups.push(group);
-      grunt.file.write('app/data.json', JSON.stringify(groups));
+      data.visual.push(group);
+
+      var files = grunt.file.expand({
+        cwd: './app/media/audio'
+      }, [
+        '*.mp3'
+      ]);
+
+      _.forEach(files, function(file) {
+        data.audio.push({
+          path: 'media/audio/' + file
+        });
+      });
+
+    }).then(function() {
+      grunt.file.write('app/data.json', JSON.stringify(data));
       done();
     });
   });
