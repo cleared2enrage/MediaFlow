@@ -1,6 +1,7 @@
 'use strict';
 
 var $ = require('jquery');
+var _ = require('lodash');
 
 var DataProvider = (function () {
   var images = null,
@@ -13,6 +14,10 @@ var DataProvider = (function () {
       imageIndex = (imageIndex + 1) % images[groupIndex].length;
       if (imageIndex === 0) {
         groupIndex = (groupIndex + 1) % images.length;
+      }
+
+      if (groupIndex === 0 && imageIndex === 0) {
+        audio = _.map(audio, _.shuffle);
       }
     },
 
@@ -43,8 +48,8 @@ var DataProvider = (function () {
     init = function (dataFilePath) {
       return new Promise(function(resolve) {
         $.getJSON(dataFilePath, function (data) {
-          images = data.visual;
-          audio = data.audio;
+          images = _.map(data.visual, _.shuffle);
+          audio = _.shuffle(data.audio);
           resolve();
         });
       });
