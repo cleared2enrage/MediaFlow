@@ -34669,8 +34669,10 @@ window.Test = (function() {
       windowHeight = window.innerHeight, // TODO: change to innerHeight
       minWidth = Math.floor(windowWidth / 4),
       minHeight = Math.floor(windowHeight / 3),
+      minAspectRatio = 1 / 2.5,
+      maxAspectRatio = 2.5,
       rects = [],
-      numRects = Math.floor(Math.random() * 5) + 1,
+      numRects = Math.floor(Math.random() * 4) + 1,
       gapSize = 5;
 
     while (rects.length < numRects) {
@@ -34725,6 +34727,14 @@ window.Test = (function() {
             width: rectangle.width - randomWidth - gapSize,
             height: rectangle.height
           });
+        }
+      }
+
+      for (var i = 0; i < rects.length; i++) {
+        var aspectRatio = rects[i].width / rects[i].height;
+        if (aspectRatio < minAspectRatio || aspectRatio > maxAspectRatio) {
+          rects = [];
+          break;
         }
       }
     }
