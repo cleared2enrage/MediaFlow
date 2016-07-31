@@ -1,10 +1,14 @@
 'use strict';
 
 var $ = require('jquery');
+var _ = require('lodash');
+global.jQuery = $;
+require('jquery.facedetection');
+
 var AppInitializer = require('./AppInitializer.js');
 var DataProvider = require('./DataProvider.js');
 var TweenMax = require('gsap');
-window.$ = $;
+var smartcrop = require('smartcrop');
 
 window.run = function() {
   AppInitializer.init().then(function() {
@@ -101,7 +105,6 @@ window.run = function() {
   });
 };
 
-
 window.Test = (function() {
   var generateRectangles = function() {
     var windowWidth = window.innerWidth, // TODO: change to innerWidth
@@ -185,18 +188,122 @@ window.Test = (function() {
 }());
 
 window.rectangleTest = function() {
-  var testRects = window.Test.generateRectangles();
+  AppInitializer.init().then(function() {
 
-  for (var i = 0; i < testRects.length; i++) {
-    var rect = testRects[i];
+    var getNextLayout = function () {
+      var testRects = window.Test.generateRectangles();
 
-    $('#main').append($('<div>').css({
-      width: rect.width,
-      height: rect.height,
-      backgroundColor: 'red',
-      position: 'absolute',
-      top: rect.y,
-      left: rect.x,
-    }));
-  }
+      var getImage = function() {
+        return new Promise(function(resolve) {
+          DataProvider.getNextImage().then(function(imgData) {
+            if (imgData.type === 'photo') {
+              resolve(imgData);
+            } else {
+              resolve(getImage());
+            }
+          });
+        });
+      };
+
+      var arr = _.map(testRects, function(rect) {
+        return new Promise(function(rslv) {
+          var image = null;
+
+          getImage().then(function(imgData) {
+            return new Promise(function(resolve) {
+              image = new Image();
+              image.onload = function() {
+                image.onload = null;
+                resolve();
+              };
+              image.src = imgData.path;
+            });
+          }).then(function() {
+            return smartcrop.crop(image, {
+              width: rect.width,
+              height: rect.height
+            });
+          }).then(function(result) {
+            var canvas = $('<canvas>')[0];
+            var ctx = canvas.getContext('2d');
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            ctx.drawImage(image, result.topCrop.x, result.topCrop.y, result.topCrop.width, result.topCrop.height, 0, 0, rect.width, rect.height);
+
+            rslv({
+              x: rect.x,
+              y: rect.y,
+              width: rect.width,
+              height: rect.height,
+              src: canvas.toDataURL()
+            });
+          });
+        });
+      });
+
+      return Promise.all(arr);
+    };
+
+    var generateImageElements = function(images) {
+      return _.map(images, function(image) {
+        return $('<img>').attr({
+          src: image.src
+        }).css({
+          position: 'absolute',
+          left: image.x,
+          top: image.y,
+          width: image.width,
+          height: image.height,
+          opacity: 0
+        })[0];
+      });
+    };
+
+    var fadeImages = function (images, targetOpacity) {
+      return new Promise(function(resolve) {
+        TweenMax.staggerTo(_.shuffle(images), 1, {css: {opacity: targetOpacity}}, 1 / images.length, function() {
+          resolve(images);
+        });
+      });
+    };
+
+    var visibleImages = null;
+
+    var renderLoop = function() {
+      Promise.all([
+        getNextLayout(),
+        new Promise(function(resolve) {
+          if (visibleImages != null) {
+            setTimeout(function() {
+              resolve();
+            }, 4000);
+          } else {
+            resolve();
+          }
+        })
+      ]).then(function(results) {
+        var images = results[0];
+        var imageNodes = generateImageElements(images);
+
+        $('#main').append(imageNodes);
+
+        var step1;
+        if (visibleImages != null) {
+          step1 = fadeImages(visibleImages, 0).then(function(oldImages) {
+            $(oldImages).remove();
+          });
+        } else {
+          step1 = Promise.resolve();
+        }
+
+        step1.then(function() {
+          return fadeImages(imageNodes, 1).then(function(newImages) {
+            visibleImages = newImages;
+          });
+        }).then(renderLoop);
+      });
+    };
+
+    renderLoop();
+  });
 };
