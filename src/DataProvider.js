@@ -35,6 +35,18 @@ var DataProvider = (function () {
       });
     },
 
+    getNextVisuals = function(count) {
+      var currentGroupIndex = groupIndex;
+      var results = [];
+
+      while (groupIndex === currentGroupIndex && count-- > 0) {
+        results = images[groupIndex][imageIndex];
+        advanceImageIndexes();
+      }
+
+      return results;
+    },
+
     getNextAudio = function() {
       var song = audio[audioIndex];
       advanceAudioIndex();
@@ -57,6 +69,7 @@ var DataProvider = (function () {
 
   return {
     getNextImage: getNextImage,
+    getNextVisuals: getNextVisuals,
     getNextAudio: getNextAudio,
     init: init
   };

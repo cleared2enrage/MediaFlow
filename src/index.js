@@ -4,6 +4,7 @@ var $ = require('jquery');
 var _ = require('lodash');
 global.jQuery = $;
 require('jquery.facedetection');
+var delay = require('./utils/delay.js');
 
 var AppInitializer = require('./AppInitializer.js');
 var DataProvider = require('./DataProvider.js');
@@ -107,8 +108,8 @@ window.run = function() {
 
 window.Test = (function() {
   var generateRectangles = function() {
-    var windowWidth = window.innerWidth, // TODO: change to innerWidth
-      windowHeight = window.innerHeight, // TODO: change to innerHeight
+    var windowWidth = window.innerWidth,
+      windowHeight = window.innerHeight,
       minWidth = Math.floor(windowWidth / 4),
       minHeight = Math.floor(windowHeight / 3),
       minAspectRatio = 1 / 2.5,
@@ -151,7 +152,7 @@ window.Test = (function() {
             width: rectangle.width,
             height: rectangle.height - randomHeight - gapSize
           });
-        } else {
+        } else { // Split Horizontally
           if (rectangle.width < minWidth * 2 + gapSize) {
             continue;
           }
@@ -272,15 +273,7 @@ window.rectangleTest = function() {
     var renderLoop = function() {
       Promise.all([
         getNextLayout(),
-        new Promise(function(resolve) {
-          if (visibleImages != null) {
-            setTimeout(function() {
-              resolve();
-            }, 4000);
-          } else {
-            resolve();
-          }
-        })
+        visibleImages != null ? delay(4) : Promise.resolve()
       ]).then(function(results) {
         var images = results[0];
         var imageNodes = generateImageElements(images);

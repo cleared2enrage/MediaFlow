@@ -35097,6 +35097,18 @@ var DataProvider = (function () {
       });
     },
 
+    getNextVisuals = function(count) {
+      var currentGroupIndex = groupIndex;
+      var results = [];
+
+      while (groupIndex === currentGroupIndex && count-- > 0) {
+        results = images[groupIndex][imageIndex];
+        advanceImageIndexes();
+      }
+
+      return results;
+    },
+
     getNextAudio = function() {
       var song = audio[audioIndex];
       advanceAudioIndex();
@@ -35119,6 +35131,7 @@ var DataProvider = (function () {
 
   return {
     getNextImage: getNextImage,
+    getNextVisuals: getNextVisuals,
     getNextAudio: getNextAudio,
     init: init
   };
@@ -35134,6 +35147,7 @@ var $ = require('jquery');
 var _ = require('lodash');
 global.jQuery = $;
 require('jquery.facedetection');
+var delay = require('./utils/delay.js');
 
 var AppInitializer = require('./AppInitializer.js');
 var DataProvider = require('./DataProvider.js');
@@ -35237,8 +35251,8 @@ window.run = function() {
 
 window.Test = (function() {
   var generateRectangles = function() {
-    var windowWidth = window.innerWidth, // TODO: change to innerWidth
-      windowHeight = window.innerHeight, // TODO: change to innerHeight
+    var windowWidth = window.innerWidth,
+      windowHeight = window.innerHeight,
       minWidth = Math.floor(windowWidth / 4),
       minHeight = Math.floor(windowHeight / 3),
       minAspectRatio = 1 / 2.5,
@@ -35281,7 +35295,7 @@ window.Test = (function() {
             width: rectangle.width,
             height: rectangle.height - randomHeight - gapSize
           });
-        } else {
+        } else { // Split Horizontally
           if (rectangle.width < minWidth * 2 + gapSize) {
             continue;
           }
@@ -35402,15 +35416,7 @@ window.rectangleTest = function() {
     var renderLoop = function() {
       Promise.all([
         getNextLayout(),
-        new Promise(function(resolve) {
-          if (visibleImages != null) {
-            setTimeout(function() {
-              resolve();
-            }, 4000);
-          } else {
-            resolve();
-          }
-        })
+        visibleImages != null ? delay(4) : Promise.resolve()
       ]).then(function(results) {
         var images = results[0];
         var imageNodes = generateImageElements(images);
@@ -35439,4 +35445,17 @@ window.rectangleTest = function() {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./AppInitializer.js":6,"./DataProvider.js":7,"gsap":1,"jquery":3,"jquery.facedetection":2,"lodash":4,"smartcrop":5}]},{},[8]);
+},{"./AppInitializer.js":6,"./DataProvider.js":7,"./utils/delay.js":9,"gsap":1,"jquery":3,"jquery.facedetection":2,"lodash":4,"smartcrop":5}],9:[function(require,module,exports){
+'use strict';
+
+var delay = function(seconds) {
+  return new Promise(function(resolve) {
+    setTimeout(function() {
+      resolve();
+    }, seconds * 1000);
+  });
+};
+
+module.exports = delay;
+
+},{}]},{},[8]);
