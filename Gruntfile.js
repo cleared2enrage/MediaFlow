@@ -3,6 +3,7 @@
 var _ = require('lodash');
 var sizeOf = require('image-size');
 var getVideoDimensions = require('get-video-dimensions');
+var getVideoDuration = require('get-video-duration');
 var Promise = require('bluebird').Promise;
 
 module.exports = function (grunt) {
@@ -32,33 +33,44 @@ module.exports = function (grunt) {
       '*/*'
     ]);
 
-    var group = [],
+    var group = {
+        photos:[],
+        videos:[]
+      },
       lastGroup = null;
 
     Promise.each(files, function(file) {
       var groupName = _.split(file, '/')[0];
       var extension = _.last(_.split(file, '.')).toLowerCase();
 
-      if (groupName !== lastGroup && group.length > 0) {
+      if (groupName !== lastGroup && lastGroup != null) {
         data.visual.push(group);
-        group = [];
+        group = {
+          photos:[],
+          videos:[]
+        };
       }
       lastGroup = groupName;
 
       if (extension === 'mp4') {
+        var video = {
+          path: 'media/visual/' + file,
+        };
+
         return getVideoDimensions('app/media/visual/' + file).then(function(result) {
-          group.push({
-            type: 'video',
-            path: 'media/visual/' + file,
-            width: result.width,
-            height: result.height
+          video.width = result.width;
+          video.height = result.height;
+        }).then(function() {
+          return getVideoDuration('app/media/visual/' + file).then(function(duration) {
+            video.duration = duration;
           });
+        }).then(function() {
+          group.videos.push(video);
         });
       } else {
         var dim = sizeOf('app/media/visual/' + file);
 
-        group.push({
-          type: 'photo',
+        group.photos.push({
           path: 'media/visual/' + file,
           width: dim.width,
           height: dim.height
