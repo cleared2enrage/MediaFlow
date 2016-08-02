@@ -4,73 +4,106 @@ var $ = require('jquery');
 var _ = require('lodash');
 
 var DataProvider = (function () {
-  var images = null,
-    audio = null,
+  var data = null,
     groupIndex = 0,
-    imageIndex = 0,
     audioIndex = 0,
+    photoIndex = 0,
+    videoIndex = 0,
 
-    advanceImageIndexes = function () {
-      imageIndex = (imageIndex + 1) % images[groupIndex].length;
-      if (imageIndex === 0) {
-        groupIndex = (groupIndex + 1) % images.length;
-      }
-
-      if (groupIndex === 0 && imageIndex === 0) {
-        audio = _.map(audio, _.shuffle);
-      }
+    _shuffleGroupVisuals = function() {
+      var group = data.visual[groupIndex];
+      group.photos = _.shuffle(group.photos);
+      group.videos = _.shuffle(group.videos);
     },
 
-    advanceAudioIndex = function() {
-      audioIndex = (audioIndex  + 1) % audio.length;
+    _shouldAdvanceGroupIndex = function() {
+      return (photoIndex === 0 && videoIndex === 0);
     },
 
-    getNextImage = function () {
-      var image = images[groupIndex][imageIndex];
-      advanceImageIndexes();
-      return new Promise(function (resolve) {
-        $.get(image.path, function() {
-          resolve(image);
-        });
-      });
+    _advanceGroupIndex = function() {
+      _shuffleGroupVisuals();
+
+      groupIndex = (groupIndex + 1) % data.visual.length;
+      photoIndex = data.visual[groupIndex].photos.length;
+      videoIndex = data.visual[groupIndex].photos.length;
+    },
+
+    _shouldIncludeVideo = function () {
+      return (Math.random() < videoIndex / (videoIndex + photoIndex));
+    },
+
+    _getNextPhoto = function() {
+      var photo = data.visual[groupIndex].photos[--photoIndex];
+
+      if (_shouldAdvanceGroupIndex()) {
+        _advanceGroupIndex();
+      }
+
+      return photo;
+    },
+
+    _getNextVideo = function() {
+      var video = data.visual[groupIndex].videos[--videoIndex];
+
+      if (_shouldAdvanceGroupIndex()) {
+        _advanceGroupIndex();
+      }
+
+      return video;
+    },
+
+    getNextSong = function() {
+      var song = data.audio[audioIndex++];
+      audioIndex %= data.audio.length;
+      return song;
     },
 
     getNextVisuals = function(count) {
-      var currentGroupIndex = groupIndex;
-      var results = [];
+      var results = [],
+        initialGroupIndex = groupIndex;
 
-      while (groupIndex === currentGroupIndex && count-- > 0) {
-        results = images[groupIndex][imageIndex];
-        advanceImageIndexes();
+      if (_shouldIncludeVideo()) {
+        var video = _getNextVideo();
+        results.push(video);
+        count--;
+
+        if (video.duration > 15) {
+          return results;
+        }
+      }
+
+      while (initialGroupIndex === groupIndex && count > 0) {
+        results.push(_getNextPhoto());
+        count--;
       }
 
       return results;
     },
 
-    getNextAudio = function() {
-      var song = audio[audioIndex];
-      advanceAudioIndex();
-      return new Promise(function (resolve) {
-        $.get(song.path, function() {
-          resolve(song);
-        });
-      });
-    },
-
     init = function (dataFilePath) {
       return new Promise(function(resolve) {
-        $.getJSON(dataFilePath, function (data) {
-          images = _.map(data.visual, _.shuffle);
-          audio = _.shuffle(data.audio);
+        $.getJSON(dataFilePath, function (result) {
+          data = result;
+
+          data.audio = _.shuffle(data.audio);
+          data.visual = _.map(data.visual, function(group) {
+            return {
+              photos: _.shuffle(group.photos),
+              videos: _.shuffle(group.videos)
+            };
+          });
+
+          photoIndex = data.visual[groupIndex].photos.length;
+          videoIndex = data.visual[groupIndex].videos.length;
+
           resolve();
         });
       });
     };
 
   return {
-    getNextImage: getNextImage,
+    getNextSong: getNextSong,
     getNextVisuals: getNextVisuals,
-    getNextAudio: getNextAudio,
     init: init
   };
 })();

@@ -54,6 +54,7 @@ module.exports = function (grunt) {
 
       if (extension === 'mp4') {
         var video = {
+          type: 'video',
           path: 'media/visual/' + file,
         };
 
@@ -71,6 +72,7 @@ module.exports = function (grunt) {
         var dim = sizeOf('app/media/visual/' + file);
 
         group.photos.push({
+          type: 'photo',
           path: 'media/visual/' + file,
           width: dim.width,
           height: dim.height
