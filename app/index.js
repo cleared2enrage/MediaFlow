@@ -35079,7 +35079,7 @@ var DataProvider = (function () {
     },
 
     _shouldAdvanceGroupIndex = function() {
-      return (photoIndex === 0 && videoIndex === 0);
+      return (photoIndex <= 0 && videoIndex <= 0);
     },
 
     _advanceGroupIndex = function() {
@@ -35087,31 +35087,27 @@ var DataProvider = (function () {
 
       groupIndex = (groupIndex + 1) % data.visual.length;
       photoIndex = data.visual[groupIndex].photos.length;
-      videoIndex = data.visual[groupIndex].photos.length;
+      videoIndex = data.visual[groupIndex].videos.length;
     },
 
     _shouldIncludeVideo = function () {
       return (Math.random() < videoIndex / (videoIndex + photoIndex));
     },
 
+    _areVideosRemaining = function() {
+      return videoIndex > 0;
+    },
+
+    _arePhotosRemaining = function() {
+      return photoIndex > 0;
+    },
+
     _getNextPhoto = function() {
-      var photo = data.visual[groupIndex].photos[--photoIndex];
-
-      if (_shouldAdvanceGroupIndex()) {
-        _advanceGroupIndex();
-      }
-
-      return photo;
+      return data.visual[groupIndex].photos[--photoIndex];
     },
 
     _getNextVideo = function() {
-      var video = data.visual[groupIndex].videos[--videoIndex];
-
-      if (_shouldAdvanceGroupIndex()) {
-        _advanceGroupIndex();
-      }
-
-      return video;
+      return data.visual[groupIndex].videos[--videoIndex];
     },
 
     getNextSong = function() {
@@ -35121,10 +35117,9 @@ var DataProvider = (function () {
     },
 
     getNextVisuals = function(count) {
-      var results = [],
-        initialGroupIndex = groupIndex;
+      var results = [];
 
-      if (_shouldIncludeVideo()) {
+      if (_areVideosRemaining() && _shouldIncludeVideo()) {
         var video = _getNextVideo();
         results.push(video);
         count--;
@@ -35134,9 +35129,13 @@ var DataProvider = (function () {
         }
       }
 
-      while (initialGroupIndex === groupIndex && count > 0) {
+      while (_arePhotosRemaining() && count > 0) {
         results.push(_getNextPhoto());
         count--;
+      }
+
+      if (_shouldAdvanceGroupIndex()) {
+        _advanceGroupIndex();
       }
 
       return results;
@@ -35283,7 +35282,7 @@ window.run = function() {
 };
 
 window.Test = (function() {
-  var generateRectangles = function() {
+  var generateRectangles = function(count) {
     var windowWidth = window.innerWidth,
       windowHeight = window.innerHeight,
       minWidth = Math.floor(windowWidth / 4),
@@ -35291,10 +35290,9 @@ window.Test = (function() {
       minAspectRatio = 1 / 2.5,
       maxAspectRatio = 2.5,
       rects = [],
-      numRects = Math.floor(Math.random() * 4) + 1,
       gapSize = 5;
 
-    while (rects.length < numRects) {
+    while (rects.length < count) {
       var numIterations = 0;
       rects = [{
         x: gapSize,
@@ -35303,7 +35301,7 @@ window.Test = (function() {
         height: windowHeight - 2 * gapSize
       }];
 
-      while (rects.length < numRects && numIterations++ < 100) {
+      while (rects.length < count && numIterations++ < 100) {
 
         // Pick rectangle at random
         var index = Math.floor(Math.random() * rects.length);
@@ -35368,33 +35366,56 @@ window.rectangleTest = function() {
   AppInitializer.init().then(function() {
 
     var getNextLayout = function () {
-      var testRects = window.Test.generateRectangles();
+      var count = Math.floor(Math.random() * 4) + 1;
+      var visuals = [];
+      var testRects = [];
 
-      var getImage = function() {
-        return new Promise(function(resolve) {
-          DataProvider.getNextImage().then(function(imgData) {
-            if (imgData.type === 'photo') {
-              resolve(imgData);
-            } else {
-              resolve(getImage());
-            }
+      while (visuals.length == 0) {
+        visuals = DataProvider.getNextVisuals(count);
+      }
+      testRects = window.Test.generateRectangles(visuals.length);
+
+      visuals = _.sortBy(visuals, function(v) {
+        return v.width / v.height;
+      });
+
+      testRects = _.sortBy(testRects, function(r) {
+        return r.width / r.height;
+      });
+
+      var arr = _.map(_.range(visuals.length), function(i) {
+        var visual = visuals[i];
+        var rect = testRects[i];
+
+        if (visual.type === 'video') {
+          return new Promise(function(resolve) {
+            var video = document.createElement('video');
+            video.oncanplay = function() {
+              video.oncanplay = null;
+              resolve({
+                type: 'video',
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+                src: visual.path
+              });
+            };
+            video.src = visual.path;
+            video.load();
           });
-        });
-      };
+        }
 
-      var arr = _.map(testRects, function(rect) {
         return new Promise(function(rslv) {
           var image = null;
 
-          getImage().then(function(imgData) {
-            return new Promise(function(resolve) {
-              image = new Image();
-              image.onload = function() {
-                image.onload = null;
-                resolve();
-              };
-              image.src = imgData.path;
-            });
+          return new Promise(function(resolve) {
+            image = new Image();
+            image.onload = function() {
+              image.onload = null;
+              resolve();
+            };
+            image.src = visual.path;
           }).then(function() {
             return smartcrop.crop(image, {
               width: rect.width,
@@ -35408,6 +35429,7 @@ window.rectangleTest = function() {
             ctx.drawImage(image, result.topCrop.x, result.topCrop.y, result.topCrop.width, result.topCrop.height, 0, 0, rect.width, rect.height);
 
             rslv({
+              type: 'photo',
               x: rect.x,
               y: rect.y,
               width: rect.width,
@@ -35423,33 +35445,78 @@ window.rectangleTest = function() {
 
     var generateImageElements = function(images) {
       return _.map(images, function(image) {
-        return $('<img>').attr({
-          src: image.src
-        }).css({
-          position: 'absolute',
-          left: image.x,
-          top: image.y,
-          width: image.width,
-          height: image.height,
-          opacity: 0
-        })[0];
+        if (image.type === 'photo') {
+          return $('<img>').attr({
+            src: image.src
+          }).css({
+            position: 'absolute',
+            left: image.x,
+            top: image.y,
+            width: image.width,
+            height: image.height,
+            opacity: 0
+          })[0];
+        } else {
+          return $('<div>').css({
+            position: 'absolute',
+            left: image.x,
+            top: image.y,
+            width: image.width,
+            height: image.height,
+            opacity: 0,
+            overflow: 'hidden'
+          }).append($('<video>').attr({
+            preload: 'auto',
+            controls: false,
+            muted: true,
+            src: image.src
+          }).css({
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            minWidth: '100%',
+            minHeight: '100%'
+          }))[0];
+        }
       });
     };
 
     var fadeImages = function (images, targetOpacity) {
       return new Promise(function(resolve) {
-        TweenMax.staggerTo(_.shuffle(images), 1, {css: {opacity: targetOpacity}}, 1 / images.length, function() {
+        TweenMax.staggerTo(_.shuffle(images), 1, {css: {opacity: targetOpacity}, onStart: function() {
+          if (this.target.tagName !== 'IMG' && this.vars.css.opacity === 1) {
+            this.target.children[0].play();
+          }
+        }}, 1 / images.length, function() {
           resolve(images);
         });
       });
     };
 
+    var getShowCompletePromise = function(elements) {
+      return Promise.all(_.map(elements, function(element) {
+        if (element.tagName === 'IMG') {
+          return delay(4);
+        }
+
+        var video = element.children[0];
+        return new Promise(function(resolve) {
+          video.onended = function() {
+            video.onended = null;
+            resolve();
+          };
+        });
+      }));
+    };
+
     var visibleImages = null;
+    var showComplete = Promise.resolve();
 
     var renderLoop = function() {
       Promise.all([
         getNextLayout(),
-        visibleImages != null ? delay(4) : Promise.resolve()
+        showComplete,
       ]).then(function(results) {
         var images = results[0];
         var imageNodes = generateImageElements(images);
@@ -35468,6 +35535,7 @@ window.rectangleTest = function() {
         step1.then(function() {
           return fadeImages(imageNodes, 1).then(function(newImages) {
             visibleImages = newImages;
+            showComplete = getShowCompletePromise(newImages);
           });
         }).then(renderLoop);
       });

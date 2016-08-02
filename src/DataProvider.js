@@ -17,7 +17,7 @@ var DataProvider = (function () {
     },
 
     _shouldAdvanceGroupIndex = function() {
-      return (photoIndex === 0 && videoIndex === 0);
+      return (photoIndex <= 0 && videoIndex <= 0);
     },
 
     _advanceGroupIndex = function() {
@@ -25,31 +25,27 @@ var DataProvider = (function () {
 
       groupIndex = (groupIndex + 1) % data.visual.length;
       photoIndex = data.visual[groupIndex].photos.length;
-      videoIndex = data.visual[groupIndex].photos.length;
+      videoIndex = data.visual[groupIndex].videos.length;
     },
 
     _shouldIncludeVideo = function () {
       return (Math.random() < videoIndex / (videoIndex + photoIndex));
     },
 
+    _areVideosRemaining = function() {
+      return videoIndex > 0;
+    },
+
+    _arePhotosRemaining = function() {
+      return photoIndex > 0;
+    },
+
     _getNextPhoto = function() {
-      var photo = data.visual[groupIndex].photos[--photoIndex];
-
-      if (_shouldAdvanceGroupIndex()) {
-        _advanceGroupIndex();
-      }
-
-      return photo;
+      return data.visual[groupIndex].photos[--photoIndex];
     },
 
     _getNextVideo = function() {
-      var video = data.visual[groupIndex].videos[--videoIndex];
-
-      if (_shouldAdvanceGroupIndex()) {
-        _advanceGroupIndex();
-      }
-
-      return video;
+      return data.visual[groupIndex].videos[--videoIndex];
     },
 
     getNextSong = function() {
@@ -59,10 +55,9 @@ var DataProvider = (function () {
     },
 
     getNextVisuals = function(count) {
-      var results = [],
-        initialGroupIndex = groupIndex;
+      var results = [];
 
-      if (_shouldIncludeVideo()) {
+      if (_areVideosRemaining() && _shouldIncludeVideo()) {
         var video = _getNextVideo();
         results.push(video);
         count--;
@@ -72,9 +67,13 @@ var DataProvider = (function () {
         }
       }
 
-      while (initialGroupIndex === groupIndex && count > 0) {
+      while (_arePhotosRemaining() && count > 0) {
         results.push(_getNextPhoto());
         count--;
+      }
+
+      if (_shouldAdvanceGroupIndex()) {
+        _advanceGroupIndex();
       }
 
       return results;
