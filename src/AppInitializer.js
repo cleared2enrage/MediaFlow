@@ -3,10 +3,16 @@
 var DataProvider = require('./DataProvider.js');
 
 var AppInitializer = (function () {
+  var promise = null;
+
   var init = function () {
-    return Promise.all([
-      DataProvider.init('data.json')
-    ]);
+    if (!promise) {
+      promise = Promise.all([
+        DataProvider.init('data.json')
+      ]);
+    }
+
+    return promise;
   };
 
   return {

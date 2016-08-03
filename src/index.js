@@ -4,6 +4,7 @@ var $ = require('jquery');
 var _ = require('lodash');
 global.jQuery = $;
 require('jquery.facedetection');
+require('./MP3Player.js');
 var delay = require('./utils/delay.js');
 
 var AppInitializer = require('./AppInitializer.js');
@@ -362,7 +363,9 @@ window.rectangleTest = function() {
             visibleImages = newImages;
             showComplete = getShowCompletePromise(newImages);
           });
-        }).then(renderLoop);
+        }).then(function() {
+          renderLoop();
+        });
       });
     };
 

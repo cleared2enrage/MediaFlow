@@ -35046,10 +35046,16 @@ if (typeof module !== 'undefined') {
 var DataProvider = require('./DataProvider.js');
 
 var AppInitializer = (function () {
+  var promise = null;
+
   var init = function () {
-    return Promise.all([
-      DataProvider.init('data.json')
-    ]);
+    if (!promise) {
+      promise = Promise.all([
+        DataProvider.init('data.json')
+      ]);
+    }
+
+    return promise;
   };
 
   return {
@@ -35172,6 +35178,64 @@ var DataProvider = (function () {
 module.exports = DataProvider;
 
 },{"jquery":3,"lodash":4}],8:[function(require,module,exports){
+'use strict';
+
+var AppInitializer = require('./AppInitializer.js');
+var DataProvider = require('./DataProvider.js');
+var TweenMax = require('gsap');
+
+var audioElement = null,
+  fadeOutTriggered = false,
+
+  createAudioElement = function() {
+    audioElement = document.createElement('audio');
+    audioElement.autoplay = false;
+    audioElement.preload = 'auto';
+    audioElement.volume = 0;
+
+    audioElement.addEventListener('timeupdate', onTimeUpdate);
+    audioElement.addEventListener('ended', onEnded);
+  },
+
+  loadNextSong = function() {
+    var song = DataProvider.getNextSong();
+
+    audioElement.pause();
+    audioElement.src = song.path;
+    audioElement.play();
+
+    fadeIn();
+  },
+
+  fadeIn = function() {
+    TweenMax.to(audioElement, 5, {volume: 1});
+  },
+
+  fadeOut = function() {
+    TweenMax.to(audioElement, 5, {volume: 0});
+  },
+
+  onEnded = function() {
+    fadeOutTriggered = false;
+    loadNextSong();
+  },
+
+  onTimeUpdate = function() {
+    if (!fadeOutTriggered && audioElement.duration - audioElement.currentTime < 5) { // TODO: Extend to configuration
+      fadeOutTriggered = true;
+      fadeOut();
+    }
+  },
+
+  start = function() {
+    createAudioElement();
+    document.body.appendChild(audioElement);
+    loadNextSong();
+  };
+
+AppInitializer.init().then(start);
+
+},{"./AppInitializer.js":6,"./DataProvider.js":7,"gsap":1}],9:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -35179,6 +35243,7 @@ var $ = require('jquery');
 var _ = require('lodash');
 global.jQuery = $;
 require('jquery.facedetection');
+require('./MP3Player.js');
 var delay = require('./utils/delay.js');
 
 var AppInitializer = require('./AppInitializer.js');
@@ -35537,7 +35602,9 @@ window.rectangleTest = function() {
             visibleImages = newImages;
             showComplete = getShowCompletePromise(newImages);
           });
-        }).then(renderLoop);
+        }).then(function() {
+          renderLoop();
+        });
       });
     };
 
@@ -35546,7 +35613,7 @@ window.rectangleTest = function() {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./AppInitializer.js":6,"./DataProvider.js":7,"./utils/delay.js":9,"gsap":1,"jquery":3,"jquery.facedetection":2,"lodash":4,"smartcrop":5}],9:[function(require,module,exports){
+},{"./AppInitializer.js":6,"./DataProvider.js":7,"./MP3Player.js":8,"./utils/delay.js":10,"gsap":1,"jquery":3,"jquery.facedetection":2,"lodash":4,"smartcrop":5}],10:[function(require,module,exports){
 'use strict';
 
 var delay = function(seconds) {
@@ -35559,4 +35626,4 @@ var delay = function(seconds) {
 
 module.exports = delay;
 
-},{}]},{},[8]);
+},{}]},{},[9]);
