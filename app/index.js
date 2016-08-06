@@ -34571,7 +34571,8 @@ var DataProvider = (function () {
     },
 
     getNextVisuals = function(count) {
-      var results = [];
+      var results = [],
+        selectPhotos = true;
 
       if (_areVideosRemaining() && _shouldIncludeVideo()) {
         var video = _getNextVideo();
@@ -34579,11 +34580,11 @@ var DataProvider = (function () {
         count--;
 
         if (video.duration > 15) {
-          return results;
+          selectPhotos = false;
         }
       }
 
-      while (_arePhotosRemaining() && count > 0) {
+      while (selectPhotos && _arePhotosRemaining() && count > 0) {
         results.push(_getNextPhoto());
         count--;
       }
@@ -34883,9 +34884,7 @@ window.rectangleTest = function() {
       var visuals = [];
       var testRects = [];
 
-      while (visuals.length == 0) {
-        visuals = DataProvider.getNextVisuals(count);
-      }
+      visuals = DataProvider.getNextVisuals(count);
       testRects = window.Test.generateRectangles(visuals.length);
 
       visuals = _.sortBy(visuals, function(v) {

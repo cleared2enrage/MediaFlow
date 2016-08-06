@@ -196,9 +196,7 @@ window.rectangleTest = function() {
       var visuals = [];
       var testRects = [];
 
-      while (visuals.length == 0) {
-        visuals = DataProvider.getNextVisuals(count);
-      }
+      visuals = DataProvider.getNextVisuals(count);
       testRects = window.Test.generateRectangles(visuals.length);
 
       visuals = _.sortBy(visuals, function(v) {
