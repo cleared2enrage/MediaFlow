@@ -21,6 +21,7 @@
     "eslint-plugin-standard": "^2.0.0",
     "get-video-dimensions": "^1.0.0",
     "get-video-duration": "0.0.1",
+    "gm": "^1.23.0",
     "grunt": "^1.0.1",
     "grunt-browserify": "^5.0.0",
     "grunt-contrib-connect": "^1.0.2",
@@ -32,6 +33,7 @@
     "load-grunt-config": "^0.19.2",
     "serve-index": "^1.8.0",
     "serve-static": "^1.11.1",
+    "smartcrop-gm": "^1.0.1",
     "time-grunt": "^1.4.0"
   },
   "scripts": {

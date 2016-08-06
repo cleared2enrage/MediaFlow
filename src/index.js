@@ -10,7 +10,7 @@ var delay = require('./utils/delay.js');
 var AppInitializer = require('./AppInitializer.js');
 var DataProvider = require('./DataProvider.js');
 var TweenMax = require('gsap');
-var smartcrop = require('smartcrop');
+// var smartcrop = require('smartcrop');
 
 window.run = function() {
   AppInitializer.init().then(function() {
@@ -241,26 +241,15 @@ window.rectangleTest = function() {
               image.onload = null;
               resolve();
             };
-            image.src = visual.path;
+            image.src = visual.path + '?width=' + rect.width + '&height=' + rect.height;
           }).then(function() {
-            return smartcrop.crop(image, {
-              width: rect.width,
-              height: rect.height
-            });
-          }).then(function(result) {
-            var canvas = $('<canvas>')[0];
-            var ctx = canvas.getContext('2d');
-            canvas.width = rect.width;
-            canvas.height = rect.height;
-            ctx.drawImage(image, result.topCrop.x, result.topCrop.y, result.topCrop.width, result.topCrop.height, 0, 0, rect.width, rect.height);
-
             rslv({
               type: 'photo',
               x: rect.x,
               y: rect.y,
               width: rect.width,
               height: rect.height,
-              src: canvas.toDataURL()
+              src: visual.path + '?width=' + rect.width + '&height=' + rect.height
             });
           });
         });
