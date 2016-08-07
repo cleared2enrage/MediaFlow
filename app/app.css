@@ -124,6 +124,7 @@ table {
 }
 #main {
   background-color: black;
+  cursor: none;
   height: 100%;
   overflow: hidden;
   position: fixed;

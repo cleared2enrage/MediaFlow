@@ -34629,6 +34629,138 @@ module.exports = DataProvider;
 },{"jquery":3,"lodash":4}],7:[function(require,module,exports){
 'use strict';
 
+var GAP_SIZE = 5;
+var DEFAULTS = {
+  width: 'auto',
+  height: 'auto',
+  minWidth: 'auto',
+  minHeight: 'auto',
+  maxAspectRatio: 2.5
+};
+
+var _ = require('lodash');
+
+var Rectangle = require('./objects/Rectangle.js');
+
+var LayoutBuilder = function(options) {
+  var opts = _.assignIn({}, DEFAULTS, options || {});
+
+  this._width = opts.width;
+  this._height = opts.height;
+  this._minWidth = opts.minWidth;
+  this._minHeight = opts.minHeight;
+  this._minAspectRatio = 1 / opts.maxAspectRatio;
+  this._maxAspectRatio = opts.maxAspectRatio;
+};
+
+module.exports = LayoutBuilder;
+
+LayoutBuilder.prototype._getWidth = function() {
+  if (this._width === 'auto') {
+    return window.innerWidth;
+  }
+  return this._width;
+};
+
+LayoutBuilder.prototype._getHeight = function() {
+  if (this._height === 'auto') {
+    return window.innerHeight;
+  }
+  return this._height;
+};
+
+LayoutBuilder.prototype._getMinWidth = function() {
+  if (this._minWidth === 'auto') {
+    return _.floor(this._getWidth() / 4);
+  }
+  return this._minWidth;
+};
+
+LayoutBuilder.prototype._getMinHeight = function() {
+  if (this._minHeight === 'auto') {
+    return _.floor(this._getHeight() / 3);
+  }
+  return this._minHeight;
+};
+
+LayoutBuilder.prototype._splitRectangle = function(rect) {
+
+  var splitVertically = !!_.random(1, false);
+
+  var minDimension = splitVertically
+    ? this._getMinHeight()
+    : this._getMinWidth();
+
+  var maxDimension = splitVertically
+    ? rect.height - minDimension - GAP_SIZE
+    : rect.width - minDimension - GAP_SIZE;
+
+  var randomLength = _.random(minDimension, maxDimension, false);
+
+  if (splitVertically) {
+    return [
+      new Rectangle(
+        rect.x,
+        rect.y,
+        rect.width,
+        randomLength
+      ),
+      new Rectangle(
+        rect.x,
+        rect.y + randomLength + GAP_SIZE,
+        rect.width,
+        rect.height - randomLength - GAP_SIZE
+      )
+    ];
+  } else {
+    return [
+      new Rectangle(
+        rect.x,
+        rect.y,
+        randomLength,
+        rect.height
+      ),
+      new Rectangle(
+        rect.x + randomLength + GAP_SIZE,
+        rect.y,
+        rect.width - randomLength - GAP_SIZE,
+        rect.height
+      )
+    ];
+  }
+};
+
+LayoutBuilder.prototype._isValidLayout = function(rects) {
+  var that = this;
+  return _.every(rects, function(rect) {
+    return (rect.aspectRatio >= that._minAspectRatio && rect.aspectRatio <= that._maxAspectRatio);
+  });
+};
+
+LayoutBuilder.prototype.generateLayout = function(count) {
+  var rects = [
+    new Rectangle(
+      GAP_SIZE,
+      GAP_SIZE,
+      this._getWidth() - 2 * GAP_SIZE,
+      this._getHeight() - 2 * GAP_SIZE
+    )
+  ];
+
+  while (rects.length < count) {
+    var rectToSplit = rects.splice(_.random(rects.length - 1, false), 1)[0];
+    rects = rects.concat(this._splitRectangle(rectToSplit));
+  }
+
+  if (!this._isValidLayout(rects)) {
+    return this.generateLayout(count);
+  }
+  return rects;
+};
+
+},{"./objects/Rectangle.js":10,"lodash":4}],8:[function(require,module,exports){
+'use strict';
+
 var AppInitializer = require('./AppInitializer.js');
 var DataProvider = require('./DataProvider.js');
 var TweenMax = require('gsap');
@@ -34684,7 +34816,7 @@ var audioElement = null,
 
 AppInitializer.init().then(start);
 
-},{"./AppInitializer.js":5,"./DataProvider.js":6,"gsap":1}],8:[function(require,module,exports){
+},{"./AppInitializer.js":5,"./DataProvider.js":6,"gsap":1}],9:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -34697,195 +34829,17 @@ var delay = require('./utils/delay.js');
 
 var AppInitializer = require('./AppInitializer.js');
 var DataProvider = require('./DataProvider.js');
+var LayoutBuilder = require('./LayoutBuilder');
 var TweenMax = require('gsap');
-// var smartcrop = require('smartcrop');
 
-window.run = function() {
+(function() {
   AppInitializer.init().then(function() {
-    var container = $('#main');
-    var audioPlayer = null;
-
-    var createPhoto = function (image) {
-      return $('<div>').attr({
-        'class': 'photo'
-      }).append($('<img>').attr({
-        src: image.path
-      }));
-    };
-
-    var createVideo = function (video) {
-      return $('<div>').attr({
-        'class': 'photo'
-      }).append($('<video>').attr({
-        muted: true,
-        preload: 'auto',
-        src: video.path,
-        autoplay: true
-      }));
-    };
-
-    var showPhoto = function () {
-      $('.photo').toggleClass('show');
-    };
-
-    var onPhotoReady = function (image) {
-      var newMedia = image.type === 'photo'
-      ? createPhoto(image)
-      : createVideo(image);
-
-      container.append(newMedia);
-      setTimeout(showPhoto, 250);
-
-      if (image.type === 'photo') {
-        setTimeout(changePhoto, 4000);
-      } else {
-        var triggered = false;
-        $('video', newMedia).on('timeupdate', function() {
-          if (!triggered && this.duration - this.currentTime < 1.25) {
-            triggered = true;
-            changePhoto();
-          }
-        });
-      }
-    };
-
-    var changePhoto = function () {
-      DataProvider.getNextImage().then(onPhotoReady);
-    };
-
-    var onSongReady = function(song) {
-      var triggered = false;
-      if (audioPlayer == null) {
-        audioPlayer = $('<audio>').attr({
-          autoplay: true,
-          preload: 'auto',
-          volume: 0
-        }).on('timeupdate', function() {
-          if (!triggered && this.duration - this.currentTime < 5.25) {
-            triggered = true;
-            TweenMax.to(this, 5, {volume: 0});
-          }
-        }).on('ended', function() {
-          triggered = false;
-          changeSong();
-        });
-        audioPlayer[0].volume = 0;
-        $('body').append(audioPlayer);
-      }
-      audioPlayer[0].pause();
-      audioPlayer.attr({
-        src: song.path
-      });
-      audioPlayer[0].play();
-      TweenMax.to(audioPlayer, 5, { volume: 1 });
-    };
-
-    var changeSong = function() {
-      DataProvider.getNextAudio().then(onSongReady);
-    };
-
-    container.on('transitionend', function() {
-      $('.photo:not(.show)').remove();
-    });
-
-    changePhoto();
-    changeSong();
-  }, function (message) {
-    console.error(message);
-  });
-};
-
-window.Test = (function() {
-  var generateRectangles = function(count) {
-    var windowWidth = window.innerWidth,
-      windowHeight = window.innerHeight,
-      minWidth = Math.floor(windowWidth / 4),
-      minHeight = Math.floor(windowHeight / 3),
-      minAspectRatio = 1 / 2.5,
-      maxAspectRatio = 2.5,
-      rects = [],
-      gapSize = 5;
-
-    while (rects.length < count) {
-      var numIterations = 0;
-      rects = [{
-        x: gapSize,
-        y: gapSize,
-        width: windowWidth - 2 * gapSize,
-        height: windowHeight - 2 * gapSize
-      }];
-
-      while (rects.length < count && numIterations++ < 100) {
-
-        // Pick rectangle at random
-        var index = Math.floor(Math.random() * rects.length);
-        var rectangle = rects[index];
-
-        // Split rectangle at random
-        if (Math.random() < 0.5) { // Split vertically
-          if (rectangle.height < minHeight * 2 + gapSize) {
-            continue;
-          }
-
-          var randomHeight = Math.floor(Math.random() * (rectangle.height - 2 * minHeight)) + minHeight;
-
-          rects.splice(index, 1, {
-            x: rectangle.x,
-            y: rectangle.y,
-            width: rectangle.width,
-            height: randomHeight
-          }, {
-            x: rectangle.x,
-            y: rectangle.y + randomHeight + gapSize,
-            width: rectangle.width,
-            height: rectangle.height - randomHeight - gapSize
-          });
-        } else { // Split Horizontally
-          if (rectangle.width < minWidth * 2 + gapSize) {
-            continue;
-          }
-
-          var randomWidth = Math.floor(Math.random() * (rectangle.width - 2 * minWidth)) + minWidth;
-
-          rects.splice(index, 1, {
-            x: rectangle.x,
-            y: rectangle.y,
-            width: randomWidth,
-            height: rectangle.height
-          }, {
-            x: rectangle.x + randomWidth + gapSize,
-            y: rectangle.y,
-            width: rectangle.width - randomWidth - gapSize,
-            height: rectangle.height
-          });
-        }
-      }
-
-      for (var i = 0; i < rects.length; i++) {
-        var aspectRatio = rects[i].width / rects[i].height;
-        if (aspectRatio < minAspectRatio || aspectRatio > maxAspectRatio) {
-          rects = [];
-          break;
-        }
-      }
-    }
-    return rects;
-  };
-  return {
-    generateRectangles: generateRectangles
-  };
-}());
-
-window.rectangleTest = function() {
-  AppInitializer.init().then(function() {
+    var layoutBuilder = new LayoutBuilder();
 
     var getNextLayout = function () {
-      var count = Math.floor(Math.random() * 4) + 1;
-      var visuals = [];
-      var testRects = [];
-
-      visuals = DataProvider.getNextVisuals(count);
-      testRects = window.Test.generateRectangles(visuals.length);
+      var count = _.random(1, 4, false);
+      var visuals = DataProvider.getNextVisuals(count);
+      var testRects = layoutBuilder.generateLayout(visuals.length);
 
       visuals = _.sortBy(visuals, function(v) {
         return v.width / v.height;
@@ -35046,10 +35000,52 @@ window.rectangleTest = function() {
 
     renderLoop();
   });
-};
+}());
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./AppInitializer.js":5,"./DataProvider.js":6,"./MP3Player.js":7,"./utils/delay.js":9,"gsap":1,"jquery":3,"jquery.facedetection":2,"lodash":4}],9:[function(require,module,exports){
+},{"./AppInitializer.js":5,"./DataProvider.js":6,"./LayoutBuilder":7,"./MP3Player.js":8,"./utils/delay.js":11,"gsap":1,"jquery":3,"jquery.facedetection":2,"lodash":4}],10:[function(require,module,exports){
+'use strict';
+
+var Rectangle = function(x, y, width, height) {
+  this._x = x || 0;
+  this._y = y || 0;
+  this._width = width || 0;
+  this._height = height || 0;
+};
+
+module.exports = Rectangle;
+
+Object.defineProperties(Rectangle.prototype, {
+  x: {
+    get: function() {
+      return this._x;
+    }
+  },
+  y: {
+    get: function() {
+      return this._y;
+    }
+  },
+  width: {
+    get: function() {
+      return this._width;
+    }
+  },
+  height:
+  {
+    get: function() {
+      return this._height;
+    }
+  },
+  aspectRatio:
+  {
+    get: function() {
+      return this._width / this._height;
+    }
+  }
+});
+
+},{}],11:[function(require,module,exports){
 'use strict';
 
 var delay = function(seconds) {
@@ -35062,4 +35058,4 @@ var delay = function(seconds) {
 
 module.exports = delay;
 
-},{}]},{},[8]);
+},{}]},{},[9]);

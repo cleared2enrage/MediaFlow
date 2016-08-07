@@ -9,195 +9,17 @@ var delay = require('./utils/delay.js');
 
 var AppInitializer = require('./AppInitializer.js');
 var DataProvider = require('./DataProvider.js');
+var LayoutBuilder = require('./LayoutBuilder');
 var TweenMax = require('gsap');
-// var smartcrop = require('smartcrop');
 
-window.run = function() {
+(function() {
   AppInitializer.init().then(function() {
-    var container = $('#main');
-    var audioPlayer = null;
-
-    var createPhoto = function (image) {
-      return $('<div>').attr({
-        'class': 'photo'
-      }).append($('<img>').attr({
-        src: image.path
-      }));
-    };
-
-    var createVideo = function (video) {
-      return $('<div>').attr({
-        'class': 'photo'
-      }).append($('<video>').attr({
-        muted: true,
-        preload: 'auto',
-        src: video.path,
-        autoplay: true
-      }));
-    };
-
-    var showPhoto = function () {
-      $('.photo').toggleClass('show');
-    };
-
-    var onPhotoReady = function (image) {
-      var newMedia = image.type === 'photo'
-      ? createPhoto(image)
-      : createVideo(image);
-
-      container.append(newMedia);
-      setTimeout(showPhoto, 250);
-
-      if (image.type === 'photo') {
-        setTimeout(changePhoto, 4000);
-      } else {
-        var triggered = false;
-        $('video', newMedia).on('timeupdate', function() {
-          if (!triggered && this.duration - this.currentTime < 1.25) {
-            triggered = true;
-            changePhoto();
-          }
-        });
-      }
-    };
-
-    var changePhoto = function () {
-      DataProvider.getNextImage().then(onPhotoReady);
-    };
-
-    var onSongReady = function(song) {
-      var triggered = false;
-      if (audioPlayer == null) {
-        audioPlayer = $('<audio>').attr({
-          autoplay: true,
-          preload: 'auto',
-          volume: 0
-        }).on('timeupdate', function() {
-          if (!triggered && this.duration - this.currentTime < 5.25) {
-            triggered = true;
-            TweenMax.to(this, 5, {volume: 0});
-          }
-        }).on('ended', function() {
-          triggered = false;
-          changeSong();
-        });
-        audioPlayer[0].volume = 0;
-        $('body').append(audioPlayer);
-      }
-      audioPlayer[0].pause();
-      audioPlayer.attr({
-        src: song.path
-      });
-      audioPlayer[0].play();
-      TweenMax.to(audioPlayer, 5, { volume: 1 });
-    };
-
-    var changeSong = function() {
-      DataProvider.getNextAudio().then(onSongReady);
-    };
-
-    container.on('transitionend', function() {
-      $('.photo:not(.show)').remove();
-    });
-
-    changePhoto();
-    changeSong();
-  }, function (message) {
-    console.error(message);
-  });
-};
-
-window.Test = (function() {
-  var generateRectangles = function(count) {
-    var windowWidth = window.innerWidth,
-      windowHeight = window.innerHeight,
-      minWidth = Math.floor(windowWidth / 4),
-      minHeight = Math.floor(windowHeight / 3),
-      minAspectRatio = 1 / 2.5,
-      maxAspectRatio = 2.5,
-      rects = [],
-      gapSize = 5;
-
-    while (rects.length < count) {
-      var numIterations = 0;
-      rects = [{
-        x: gapSize,
-        y: gapSize,
-        width: windowWidth - 2 * gapSize,
-        height: windowHeight - 2 * gapSize
-      }];
-
-      while (rects.length < count && numIterations++ < 100) {
-
-        // Pick rectangle at random
-        var index = Math.floor(Math.random() * rects.length);
-        var rectangle = rects[index];
-
-        // Split rectangle at random
-        if (Math.random() < 0.5) { // Split vertically
-          if (rectangle.height < minHeight * 2 + gapSize) {
-            continue;
-          }
-
-          var randomHeight = Math.floor(Math.random() * (rectangle.height - 2 * minHeight)) + minHeight;
-
-          rects.splice(index, 1, {
-            x: rectangle.x,
-            y: rectangle.y,
-            width: rectangle.width,
-            height: randomHeight
-          }, {
-            x: rectangle.x,
-            y: rectangle.y + randomHeight + gapSize,
-            width: rectangle.width,
-            height: rectangle.height - randomHeight - gapSize
-          });
-        } else { // Split Horizontally
-          if (rectangle.width < minWidth * 2 + gapSize) {
-            continue;
-          }
-
-          var randomWidth = Math.floor(Math.random() * (rectangle.width - 2 * minWidth)) + minWidth;
-
-          rects.splice(index, 1, {
-            x: rectangle.x,
-            y: rectangle.y,
-            width: randomWidth,
-            height: rectangle.height
-          }, {
-            x: rectangle.x + randomWidth + gapSize,
-            y: rectangle.y,
-            width: rectangle.width - randomWidth - gapSize,
-            height: rectangle.height
-          });
-        }
-      }
-
-      for (var i = 0; i < rects.length; i++) {
-        var aspectRatio = rects[i].width / rects[i].height;
-        if (aspectRatio < minAspectRatio || aspectRatio > maxAspectRatio) {
-          rects = [];
-          break;
-        }
-      }
-    }
-    return rects;
-  };
-  return {
-    generateRectangles: generateRectangles
-  };
-}());
-
-window.rectangleTest = function() {
-  AppInitializer.init().then(function() {
+    var layoutBuilder = new LayoutBuilder();
 
     var getNextLayout = function () {
-      var count = Math.floor(Math.random() * 4) + 1;
-      var visuals = [];
-      var testRects = [];
-
-      visuals = DataProvider.getNextVisuals(count);
-      testRects = window.Test.generateRectangles(visuals.length);
+      var count = _.random(1, 4, false);
+      var visuals = DataProvider.getNextVisuals(count);
+      var testRects = layoutBuilder.generateLayout(visuals.length);
 
       visuals = _.sortBy(visuals, function(v) {
         return v.width / v.height;
@@ -358,4 +180,4 @@ window.rectangleTest = function() {
 
     renderLoop();
   });
-};
+}());
