@@ -34758,7 +34758,7 @@ LayoutBuilder.prototype.generateLayout = function(count) {
   return rects;
 };
 
-},{"./objects/Rectangle.js":10,"lodash":4}],8:[function(require,module,exports){
+},{"./objects/Rectangle.js":11,"lodash":4}],8:[function(require,module,exports){
 'use strict';
 
 var AppInitializer = require('./AppInitializer.js');
@@ -34820,6 +34820,8 @@ AppInitializer.init().then(start);
 (function (global){
 'use strict';
 
+var MAX_VISUALS_PER_SLIDE = 4;
+
 var $ = require('jquery');
 var _ = require('lodash');
 global.jQuery = $;
@@ -34827,183 +34829,212 @@ require('jquery.facedetection');
 require('./MP3Player.js');
 var delay = require('./utils/delay.js');
 
-var AppInitializer = require('./AppInitializer.js');
 var DataProvider = require('./DataProvider.js');
 var LayoutBuilder = require('./LayoutBuilder');
 var TweenMax = require('gsap');
 
-(function() {
-  AppInitializer.init().then(function() {
-    var layoutBuilder = new LayoutBuilder();
+var MediaFlow = function() {
+  this._currentVisuals = null;
+  this._showCompletePromise = Promise.resolve();
+  this._layoutBuilder = new LayoutBuilder();
 
-    var getNextLayout = function () {
-      var count = _.random(1, 4, false);
-      var visuals = DataProvider.getNextVisuals(count);
-      var testRects = layoutBuilder.generateLayout(visuals.length);
+  this._renderNextSlide();
+};
 
-      visuals = _.sortBy(visuals, function(v) {
-        return v.width / v.height;
-      });
+module.exports = MediaFlow;
 
-      testRects = _.sortBy(testRects, function(r) {
-        return r.width / r.height;
-      });
+MediaFlow.prototype._prepareNextSlide = function() {
+  var count = _.random(1, MAX_VISUALS_PER_SLIDE, false);
+  var visuals = DataProvider.getNextVisuals(count);
+  var layoutRects = this._layoutBuilder.generateLayout(visuals.length);
 
-      var arr = _.map(_.range(visuals.length), function(i) {
-        var visual = visuals[i];
-        var rect = testRects[i];
+  visuals = _.sortBy(visuals, function(v) { return v.width / v.height; });
+  layoutRects = _.sortBy(layoutRects, 'aspectRatio');
 
-        if (visual.type === 'video') {
-          return new Promise(function(resolve) {
-            var video = document.createElement('video');
-            video.oncanplay = function() {
-              video.oncanplay = null;
-              resolve({
-                type: 'video',
-                x: rect.x,
-                y: rect.y,
-                width: rect.width,
-                height: rect.height,
-                src: visual.path
-              });
-            };
-            video.src = visual.path;
-            video.load();
-          });
-        }
-
-        return new Promise(function(rslv) {
-          var image = null;
-
-          return new Promise(function(resolve) {
-            image = new Image();
-            image.onload = function() {
-              image.onload = null;
-              resolve();
-            };
-            image.src = visual.path + '?width=' + rect.width + '&height=' + rect.height;
-          }).then(function() {
-            rslv({
-              type: 'photo',
-              x: rect.x,
-              y: rect.y,
-              width: rect.width,
-              height: rect.height,
-              src: visual.path + '?width=' + rect.width + '&height=' + rect.height
-            });
-          });
-        });
-      });
-
-      return Promise.all(arr);
+  return _.zipWith(visuals, layoutRects, function(visual, rect) {
+    return {
+      type: visual.type,
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+      src: visual.type === 'photo'
+        ? visual.path + '?width=' + rect.width + '&height=' + rect.height
+        : visual.path
     };
-
-    var generateImageElements = function(images) {
-      return _.map(images, function(image) {
-        if (image.type === 'photo') {
-          return $('<img>').attr({
-            src: image.src
-          }).css({
-            position: 'absolute',
-            left: image.x,
-            top: image.y,
-            width: image.width,
-            height: image.height,
-            opacity: 0
-          })[0];
-        } else {
-          return $('<div>').css({
-            position: 'absolute',
-            left: image.x,
-            top: image.y,
-            width: image.width,
-            height: image.height,
-            opacity: 0,
-            overflow: 'hidden'
-          }).append($('<video>').attr({
-            preload: 'auto',
-            controls: false,
-            muted: true,
-            src: image.src
-          }).css({
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            minWidth: '100%',
-            minHeight: '100%'
-          }))[0];
-        }
-      });
-    };
-
-    var fadeImages = function (images, targetOpacity) {
-      return new Promise(function(resolve) {
-        TweenMax.staggerTo(_.shuffle(images), 1, {css: {opacity: targetOpacity}, onStart: function() {
-          if (this.target.tagName !== 'IMG' && this.vars.css.opacity === 1) {
-            this.target.children[0].play();
-          }
-        }}, 1 / images.length, function() {
-          resolve(images);
-        });
-      });
-    };
-
-    var getShowCompletePromise = function(elements) {
-      return Promise.all(_.map(elements, function(element) {
-        if (element.tagName === 'IMG') {
-          return delay(4);
-        }
-
-        var video = element.children[0];
-        return new Promise(function(resolve) {
-          video.onended = function() {
-            video.onended = null;
-            resolve();
-          };
-        });
-      }));
-    };
-
-    var visibleImages = null;
-    var showComplete = Promise.resolve();
-
-    var renderLoop = function() {
-      Promise.all([
-        getNextLayout(),
-        showComplete,
-      ]).then(function(results) {
-        var images = results[0];
-        var imageNodes = generateImageElements(images);
-
-        $('#main').append(imageNodes);
-
-        var step1;
-        if (visibleImages != null) {
-          step1 = fadeImages(visibleImages, 0).then(function(oldImages) {
-            $(oldImages).remove();
-          });
-        } else {
-          step1 = Promise.resolve();
-        }
-
-        step1.then(function() {
-          return fadeImages(imageNodes, 1).then(function(newImages) {
-            visibleImages = newImages;
-            showComplete = getShowCompletePromise(newImages);
-          });
-        }).then(function() {
-          renderLoop();
-        });
-      });
-    };
-
-    renderLoop();
   });
-}());
+};
+
+MediaFlow.prototype._preloadNextSlide = function(visuals) {
+  return Promise.all(_.map(visuals, MediaFlow.prototype._preloadVisual.bind(this)));
+};
+
+MediaFlow.prototype._preloadVisual = function(visual) {
+  switch (visual.type) {
+  case 'photo':
+    return this._preloadPhoto(visual);
+  case 'video':
+    return this._preloadVideo(visual);
+  default:
+    return Promise.reject('Unsupported Visual Type: ' + visual.type);
+  }
+};
+
+MediaFlow.prototype._preloadPhoto = function(photo) {
+  return new Promise(function(resolve) {
+    var element = new Image();
+    element.onload = function() {
+      element.onload = null;
+      resolve(photo);
+    };
+    element.src = photo.src;
+  });
+};
+
+MediaFlow.prototype._preloadVideo = function(video) {
+  return new Promise(function(resolve) {
+    var element = document.createElement('video');
+    element.oncanplay = function() {
+      element.oncanplay = null;
+      resolve(video);
+    };
+    element.src = video.src;
+    element.load();
+  });
+};
+
+MediaFlow.prototype._createElementsForSlide = function(visuals) {
+  return _.map(visuals, MediaFlow.prototype._createElementForVisual.bind(this));
+};
+
+MediaFlow.prototype._createElementForVisual = function(visual) {
+  switch (visual.type) {
+  case 'photo':
+    return this._createElementForPhoto(visual);
+  case 'video':
+    return this._createElementForVideo(visual);
+  }
+};
+
+MediaFlow.prototype._createElementForPhoto = function(photo) {
+  return $('<img>').attr({
+    src: photo.src
+  }).css({
+    position: 'absolute',
+    left: photo.x,
+    top: photo.y,
+    width: photo.width,
+    height: photo.height,
+    opacity: 0
+  })[0];
+};
+
+MediaFlow.prototype._createElementForVideo = function(video) {
+  return $('<div>').css({
+    position: 'absolute',
+    left: video.x,
+    top: video.y,
+    width: video.width,
+    height: video.height,
+    opacity: 0,
+    overflow: 'hidden'
+  }).append($('<video>').attr({
+    preload: 'auto',
+    controls: false,
+    muted: true,
+    src: video.src
+  }).css({
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    minWidth: '100%',
+    minHeight: '100%'
+  }))[0];
+};
+
+MediaFlow.prototype._appendSlideVisualsToContainer = function(elements) {
+  $('#main').append(elements);
+  return elements;
+};
+
+MediaFlow.prototype._fadeVisualElements = function(elements, targetOpacity) {
+  return new Promise(function(resolve) {
+    TweenMax.staggerTo(_.shuffle(elements), 1, {css: {opacity: targetOpacity}, onStart: function() {
+      if (this.target.tagName !== 'IMG' && this.vars.css.opacity === 1) {
+        this.target.children[0].play();
+      }
+    }}, 1 / elements.length, function() {
+      resolve(elements);
+    });
+  });
+};
+
+MediaFlow.prototype._transitionOutPreviousSlide = function(elements) {
+  if (this._currentVisuals != null) {
+    return this._fadeVisualElements(this._currentVisuals, 0).then(function(oldElements) {
+      $(oldElements).remove();
+      return elements;
+    });
+  }
+  return elements;
+};
+
+MediaFlow.prototype._transitionToNextSlide = function(elements) {
+  return this._fadeVisualElements(elements, 1).then(function(newElements) {
+    this._currentVisuals = newElements;
+    this._showCompletePromise = this._getShowCompletePromise(newElements);
+  }.bind(this));
+};
+
+MediaFlow.prototype._getShowCompletePromise = function(elements) {
+  return Promise.all(_.map(elements, function(element) {
+    if (element.tagName === 'IMG') {
+      return delay(4); // TODO: Extract constant
+    }
+
+    var video = element.children[0];
+    return new Promise(function(resolve) {
+      video.onended = function() {
+        video.onended = null;
+        resolve();
+      };
+    });
+  }));
+};
+
+MediaFlow.prototype._renderNextSlide = function() {
+  Promise.resolve()
+    .then(MediaFlow.prototype._prepareNextSlide.bind(this))
+    .then(function(visuals) {
+      return Promise.all([
+        this._preloadNextSlide(visuals),
+        this._showCompletePromise
+      ]).then(function(results) {
+        return results[0];
+      });
+    }.bind(this))
+    .then(MediaFlow.prototype._createElementsForSlide.bind(this))
+    .then(MediaFlow.prototype._appendSlideVisualsToContainer.bind(this))
+    .then(MediaFlow.prototype._transitionOutPreviousSlide.bind(this))
+    .then(MediaFlow.prototype._transitionToNextSlide.bind(this))
+    .then(MediaFlow.prototype._renderNextSlide.bind(this));
+};
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./AppInitializer.js":5,"./DataProvider.js":6,"./LayoutBuilder":7,"./MP3Player.js":8,"./utils/delay.js":11,"gsap":1,"jquery":3,"jquery.facedetection":2,"lodash":4}],10:[function(require,module,exports){
+},{"./DataProvider.js":6,"./LayoutBuilder":7,"./MP3Player.js":8,"./utils/delay.js":12,"gsap":1,"jquery":3,"jquery.facedetection":2,"lodash":4}],10:[function(require,module,exports){
+'use strict';
+
+require('./MP3Player.js');
+
+var AppInitializer = require('./AppInitializer.js');
+var MediaFlow = require('./MediaFlow.js');
+
+AppInitializer.init().then(function() {
+  new MediaFlow();
+});
+
+},{"./AppInitializer.js":5,"./MP3Player.js":8,"./MediaFlow.js":9}],11:[function(require,module,exports){
 'use strict';
 
 var Rectangle = function(x, y, width, height) {
@@ -35045,7 +35076,7 @@ Object.defineProperties(Rectangle.prototype, {
   }
 });
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 'use strict';
 
 var delay = function(seconds) {
@@ -35058,4 +35089,4 @@ var delay = function(seconds) {
 
 module.exports = delay;
 
-},{}]},{},[9]);
+},{}]},{},[10]);
