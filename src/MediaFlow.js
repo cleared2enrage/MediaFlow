@@ -163,7 +163,7 @@ MediaFlow.prototype._transitionOutPreviousSlide = function(elements) {
 MediaFlow.prototype._transitionToNextSlide = function(elements) {
   return this._fadeVisualElements(elements, 1).then(function(newElements) {
     this._currentVisuals = newElements;
-    this._showCompletePromise = this._getShowCompletePromise(newElements);
+    window.promise = this._showCompletePromise = this._getShowCompletePromise(newElements);
   }.bind(this));
 };
 

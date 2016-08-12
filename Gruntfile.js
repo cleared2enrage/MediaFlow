@@ -33,6 +33,9 @@ module.exports = function (grunt) {
       '*/*'
     ]);
 
+    var i = 0;
+    var totalCount = files.length;
+
     var group = {
         photos:[],
         videos:[]
@@ -40,6 +43,7 @@ module.exports = function (grunt) {
       lastGroup = null;
 
     Promise.each(files, function(file) {
+      grunt.log.writeln('(' + ++i + '/' + totalCount + ')', file);
       var groupName = _.split(file, '/')[0];
       var extension = _.last(_.split(file, '.')).toLowerCase();
 
